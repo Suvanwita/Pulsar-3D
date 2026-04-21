@@ -52,28 +52,12 @@ g++ src/pulsarr.cpp src/glad.c \
 ### ▶️ Run
 
 ```bash
-./pulsar
+./pulsarr
 ```
 
 ---
 
-## 📂 Assets
 
-Make sure the following structure exists:
-
-```
-assets/
-├── images/map.jpg
-└── skybox/
-    ├── right.jpg
-    ├── left.jpg
-    ├── top.jpg
-    ├── bottom.jpg
-    ├── front.jpg
-    └── back.jpg
-```
-
----
 
 ## 🎮 Controls
 
@@ -92,20 +76,6 @@ assets/
 
 ---
 
-## ⚠️ Common Issues
-
-* **Black screen?**
-
-  * Check texture paths (`assets/` folder)
-  * Ensure OpenGL 3.3 support
-
-* **Skybox not visible?**
-
-  * Ensure correct cubemap loading
-  * Check depth settings
-
----
-
 ## 🚀 Future Improvements
 
 * Lighting (Phong / PBR)
@@ -114,10 +84,6 @@ assets/
 * Sound + pulsar frequency simulation
 
 ---
-
-## 👤 Author
-
-**Alisha Singal**
 
 ---
 
