@@ -94,11 +94,40 @@ out vec4 FragColor;
 
 uniform sampler2D starTexture;
 uniform float ambientStrength;
+uniform float specularStrength;
+uniform float shininess;
+uniform float emissiveStrength;
+uniform float time;
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform vec3 viewPos;
 
 void main() {
     vec3 texColor = texture(starTexture, TexCoord).rgb;
-    vec3 ambient  = ambientStrength * texColor;
-    FragColor = vec4(ambient, 1.0);
+    vec3 norm     = normalize(Normal);
+    vec3 lightDir = normalize(lightPos - FragPos);
+    vec3 viewDir  = normalize(viewPos - FragPos);
+    vec3 halfway  = normalize(lightDir + viewDir);
+
+    float diff = max(dot(norm, lightDir), 0.0);
+    float spec = pow(max(dot(norm, halfway), 0.0), shininess);
+
+    vec3 ambient = ambientStrength * texColor;
+    vec3 diffuse = diff * texColor * lightColor;
+    vec3 specular = specularStrength * spec * lightColor;
+
+    // Layer a pulsing hotspot mask over the texture so the star keeps an energetic look.
+    float hotspotNoise =
+        sin(TexCoord.x * 34.0 + time * 1.6) *
+        sin(TexCoord.y * 27.0 - time * 1.1) *
+        sin((TexCoord.x + TexCoord.y) * 19.0 + time * 0.7);
+    float hotspotMask = pow(max(hotspotNoise, 0.0), 5.0);
+    float fresnel = pow(1.0 - max(dot(norm, viewDir), 0.0), 2.5);
+    float pulse = 0.72 + 0.28 * sin(time * 2.4);
+    vec3 emissive = texColor * (0.45 + fresnel) * hotspotMask * emissiveStrength * pulse;
+
+    vec3 color = ambient + diffuse + specular + emissive;
+    FragColor = vec4(color, 1.0);
 }
 )glsl";
 
@@ -496,6 +525,14 @@ struct Camera {
         return glm::lookAt(pos, target, {0,1,0});
     }
 
+    glm::vec3 position() const {
+        return target + glm::vec3(
+            dist * cosf(pitch) * sinf(yaw),
+            dist * sinf(pitch),
+            dist * cosf(pitch) * cosf(yaw)
+        );
+    }
+
     glm::mat4 projection(float aspect) const {
         return glm::perspective(glm::radians(fov), aspect, 0.1f, 9100.0f);
     }
@@ -586,10 +623,16 @@ static bool   g_showField   = false;
 static bool   g_showGrid    = false;
 static bool   g_showAxis    = false;
 static float  g_ambientStr  = 1.25f;
+static float  g_specularStr = 0.65f;
+static float  g_shininess   = 48.0f;
+static float  g_emissiveStr = 1.35f;
 
 static float  g_ui_rotSpeedAbs = 0.1f;
 static float  g_ui_inclDegrees = 0.0f;
 static float  g_ui_ambient     = 1.25f;
+static float  g_ui_specular    = 0.65f;
+static float  g_ui_shininess   = 48.0f;
+static float  g_ui_emissive    = 1.35f;
 
 static int g_width = 1280, g_height = 600;
 
@@ -727,6 +770,30 @@ static void drawImGuiPanel() {
 
         ImGui::Spacing();
 
+        ImGui::TextDisabled("Specular:");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::SliderFloat("##specular", &g_ui_specular, 0.0f, 1.5f, ""))
+            g_specularStr = g_ui_specular;
+        ImGui::PopItemWidth();
+
+        ImGui::Spacing();
+
+        ImGui::TextDisabled("Shininess:");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::SliderFloat("##shininess", &g_ui_shininess, 4.0f, 96.0f, "%.0f"))
+            g_shininess = g_ui_shininess;
+        ImGui::PopItemWidth();
+
+        ImGui::Spacing();
+
+        ImGui::TextDisabled("Emissive Hotspots:");
+        ImGui::PushItemWidth(-1);
+        if (ImGui::SliderFloat("##emissive", &g_ui_emissive, 0.0f, 3.0f, ""))
+            g_emissiveStr = g_ui_emissive;
+        ImGui::PopItemWidth();
+
+        ImGui::Spacing();
+
         ImGui::TextDisabled("Inclination:");
         ImGui::PushItemWidth(-1);
         if (ImGui::SliderFloat("##incl", &g_ui_inclDegrees, 0.0f, 100.0f, "%.0f deg"))
@@ -764,6 +831,12 @@ static void drawImGuiPanel() {
             g_inclination    = 0.0f;
             g_ui_ambient     = 1.25f;
             g_ambientStr     = 1.25f;
+            g_ui_specular    = 0.65f;
+            g_specularStr    = 0.65f;
+            g_ui_shininess   = 48.0f;
+            g_shininess      = 48.0f;
+            g_ui_emissive    = 1.35f;
+            g_emissiveStr    = 1.35f;
             g_showJets       = false;
             g_showField      = false;
             g_showGrid       = false;
@@ -912,6 +985,9 @@ int main() {
         float aspect = (float)g_width / (float)std::max(g_height, 1);
         glm::mat4 view = g_cam.view();
         glm::mat4 proj = g_cam.projection(aspect);
+        glm::vec3 camPos = g_cam.position();
+        glm::vec3 lightPos(3.2f, 2.3f, 2.4f);
+        glm::vec3 lightColor(0.95f, 0.98f, 1.0f);
 
         glm::mat4 pulsarModel(1.0f);
         pulsarModel = glm::rotate(pulsarModel, g_rotY,        glm::vec3(0,1,0));
@@ -947,6 +1023,13 @@ glDepthFunc(GL_LESS); // Reset back to default
         glUniformMatrix4fv(glGetUniformLocation(pulsarProg,"view"),       1,GL_FALSE,glm::value_ptr(view));
         glUniformMatrix4fv(glGetUniformLocation(pulsarProg,"projection"), 1,GL_FALSE,glm::value_ptr(proj));
         glUniform1f(glGetUniformLocation(pulsarProg,"ambientStrength"), g_ambientStr);
+        glUniform1f(glGetUniformLocation(pulsarProg,"specularStrength"), g_specularStr);
+        glUniform1f(glGetUniformLocation(pulsarProg,"shininess"), g_shininess);
+        glUniform1f(glGetUniformLocation(pulsarProg,"emissiveStrength"), g_emissiveStr);
+        glUniform1f(glGetUniformLocation(pulsarProg,"time"), now);
+        glUniform3fv(glGetUniformLocation(pulsarProg,"viewPos"), 1, glm::value_ptr(camPos));
+        glUniform3fv(glGetUniformLocation(pulsarProg,"lightPos"), 1, glm::value_ptr(lightPos));
+        glUniform3fv(glGetUniformLocation(pulsarProg,"lightColor"), 1, glm::value_ptr(lightColor));
         glUniform1i(glGetUniformLocation(pulsarProg,"starTexture"), 0);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, starTex);
