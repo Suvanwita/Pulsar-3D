@@ -42,12 +42,13 @@ This project simulates key astrophysical features like **radiation jets**, **mag
 ### 🔹 Linux / WSL
 
 ```bash
-g++ pulsarr.cpp src/glad.c \
+g++ pulsarr.cpp src/render_utils.cpp src/scene.cpp src/ui.cpp src/glad.c \
     imgui/*.cpp imgui/backends/imgui_impl_glfw.cpp \
     imgui/backends/imgui_impl_opengl3.cpp \
     -Iinclude -Iimgui -Iimgui/backends -Iglm \
     -lglfw -lGL -ldl \
     -o pulsar -std=c++17
+
 ```
 
 ### ▶️ Run
