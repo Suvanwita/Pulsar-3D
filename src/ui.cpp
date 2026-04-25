@@ -46,6 +46,23 @@ void applySciencePreset(AppState& app, int presetIndex) {
     app.syncScienceState();
 }
 
+void applyCameraPreset(AppState& app, int presetIndex) {
+    app.cameraPresetIndex = presetIndex;
+    switch (presetIndex) {
+        case 1:
+            app.cam.setFromDirection(glm::vec3(0.0f, 1.0f, 0.02f), 6.2f);
+            break;
+        case 2:
+            app.cam.setFromDirection(glm::vec3(1.0f, 0.0f, 0.0f), 5.8f);
+            break;
+        case 3:
+            app.cam.setFromDirection(glm::vec3(0.45f, 0.85f, 0.25f), 4.8f);
+            break;
+        default:
+            break;
+    }
+}
+
 void DrawScienceHint(const char* text) {
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.58f, 0.68f, 1.0f));
     ImGui::SetWindowFontScale(0.78f);
@@ -80,6 +97,9 @@ void mouseButtonCB(GLFWwindow* window, int button, int action, int) {
 
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         app->cam.dragging = (action == GLFW_PRESS);
+        if (action == GLFW_PRESS) {
+            app->cameraPresetIndex = 0;
+        }
         glfwGetCursorPos(window, &app->cam.lastX, &app->cam.lastY);
     }
 }
@@ -115,6 +135,7 @@ void scrollCB(GLFWwindow* window, double, double dy) {
 
     app->cam.dist -= static_cast<float>(dy) * 0.3f;
     app->cam.dist = glm::clamp(app->cam.dist, 0.8f, 1400.0f);
+    app->cameraPresetIndex = 0;
 }
 
 void keyCB(GLFWwindow* window, int key, int, int action, int) {
@@ -236,6 +257,28 @@ void drawImGuiPanel(AppState& app) {
             app.timeScale = app.uiTimeScale;
         }
         ImGui::PopItemWidth();
+
+        ImGui::Spacing();
+
+        ImGui::SeparatorText("Camera");
+
+        int cameraPresetIndex = app.cameraPresetIndex;
+        if (ImGui::Combo("View Preset", &cameraPresetIndex, "Free\0Top\0Equatorial\0Observer Beam\0")) {
+            applyCameraPreset(app, cameraPresetIndex);
+        }
+        DrawScienceHint("View Preset: Choose a demo angle.");
+
+        if (ImGui::Checkbox("Auto Orbit", &app.autoOrbit)) {
+            app.cameraPresetIndex = 0;
+        }
+        DrawScienceHint("Auto Orbit: Slow cinematic orbit.");
+
+        if (ImGui::SliderFloat("Orbit Speed", &app.uiAutoOrbitSpeed, 0.05f, 0.9f, "%.2f")) {
+            app.autoOrbitSpeed = app.uiAutoOrbitSpeed;
+            app.autoOrbit = true;
+            app.cameraPresetIndex = 0;
+        }
+        DrawScienceHint("Orbit Speed: Yaw speed per second.");
 
         ImGui::Spacing();
 

@@ -19,6 +19,33 @@
 #include <string>
 #include <vector>
 
+namespace {
+
+glm::vec3 currentMagneticAxisDirection(const pulsar::AppState& app) {
+    glm::mat4 model(1.0f);
+    model = glm::rotate(model, app.rotY, glm::vec3(0.0f, 1.0f, 0.0f));
+    model = glm::rotate(model, app.inclination, glm::vec3(0.0f, 0.0f, 1.0f));
+    return glm::normalize(glm::vec3(model * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)));
+}
+
+void updateCameraPreset(pulsar::AppState& app) {
+    switch (app.cameraPresetIndex) {
+        case 1:
+            app.cam.setFromDirection(glm::vec3(0.0f, 1.0f, 0.02f), 6.2f);
+            break;
+        case 2:
+            app.cam.setFromDirection(glm::vec3(1.0f, 0.0f, 0.0f), 5.8f);
+            break;
+        case 3:
+            app.cam.setFromDirection(currentMagneticAxisDirection(app), 4.8f);
+            break;
+        default:
+            break;
+    }
+}
+
+}  // namespace
+
 int main() {
     pulsar::AppState app;
 
@@ -151,6 +178,10 @@ int main() {
         if (app.rotating) {
             app.rotY -= glm::two_pi<float>() * dt * app.timeScale / app.spinPeriod;
         }
+        if (app.autoOrbit) {
+            app.cam.yaw += app.autoOrbitSpeed * dt;
+        }
+        updateCameraPreset(app);
         if (app.showJets) {
             jet1.update(dt);
             jet2.update(dt);
